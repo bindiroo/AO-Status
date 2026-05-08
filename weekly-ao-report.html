@@ -28,7 +28,7 @@
       <button class="theme" id="themeToggle" aria-label="Toggle theme">◐</button>
     </div>
     <section class="card"><div class="metric" id="metrics"></div></section>
-    <section class="card chart-card"><div class="eyebrow">Cumulative units by day</div><canvas id="lineChart"></canvas><div class="footer-note">This line chart compares cumulative AO units booked by the same point in the calendar year.</div></section>
+    <section class="card chart-card"><div class="eyebrow">Cumulative units by week</div><canvas id="lineChart"></canvas><div class="footer-note">The x-axis is spaced weekly, with month markers shown near the start of each month.</div></section>
     <section class="card bar-card"><div class="eyebrow">Units through same date</div><canvas id="barChart"></canvas><div class="footer-note">Bar totals show AO units through May 07 for each year in the file.</div></section>
   </div>
   <script>
@@ -51,7 +51,7 @@
     new Chart(document.getElementById('lineChart'), {
       type: 'line',
       data: { datasets: reportData.series.map((s, i) => ({ label: String(s.year), data: s.points.map(p => ({x: p.doy, y: p.value, label: p.dateLabel})), borderColor: colors[i % colors.length], backgroundColor: colors[i % colors.length], borderWidth: s.year === reportData.currentYear ? 4 : 2, tension: 0.25, pointRadius: 0, pointHoverRadius: 5 }))},
-      options: { responsive:true, maintainAspectRatio:false, interaction:{ mode:'nearest', intersect:false }, plugins:{ legend:{ labels:{ color:getComputedStyle(document.body).color, usePointStyle:true } }, tooltip:{ callbacks:{ title:(items)=>items[0].raw.label, label:(ctx)=>`${ctx.dataset.label}: ${nf.format(ctx.raw.y)} units` } } }, scales:{ x:{ type:'linear', min:1, max:current.points[current.points.length-1].doy, ticks:{ color:getComputedStyle(document.body).color, callback:(v)=>{ const p=current.points.find(pt=>pt.doy===v); return p ? p.label : ''; }, maxTicksLimit:8 }, grid:{ color:'rgba(127,127,127,.15)' } }, y:{ ticks:{ color:getComputedStyle(document.body).color, callback:(v)=>nf.format(v) }, grid:{ color:'rgba(127,127,127,.15)' } } } }
+      options: { responsive:true, maintainAspectRatio:false, interaction:{ mode:'nearest', intersect:false }, plugins:{ legend:{ labels:{ color:getComputedStyle(document.body).color, usePointStyle:true } }, tooltip:{ callbacks:{ title:(items)=>items[0].raw.label, label:(ctx)=>`${ctx.dataset.label}: ${nf.format(ctx.raw.y)} units` } } }, scales:{ x:{ type:'linear', min:1, max:current.points[current.points.length-1].doy, ticks:{ color:getComputedStyle(document.body).color, stepSize:7, autoSkip:false, maxRotation:0, minRotation:0, callback:(v)=>{ const p=current.points.find(pt=>pt.doy===v); if (!p) return ''; const parts = p.label.split(' '); const month = parts[0]; const day = Number(parts[1]); return day <= 7 ? month : p.label; } }, grid:{ color:'rgba(127,127,127,.15)' } }, y:{ ticks:{ color:getComputedStyle(document.body).color, callback:(v)=>nf.format(v) }, grid:{ color:'rgba(127,127,127,.15)' } } } }
     });
     new Chart(document.getElementById('barChart'), {
       type: 'bar',
