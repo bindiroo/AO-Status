@@ -61,8 +61,10 @@ function parseCSV(text) {
       row.push(field);
       field = '';
     } else if ((char === '
-' || char === '') && !inQuotes) {
-      if (char === '' && next === '
+' || char === '
+') && !inQuotes) {
+      if (char === '
+' && next === '
 ') i++;
       row.push(field);
       if (row.some(cell => cell.trim() !== '')) rows.push(row);
@@ -220,10 +222,10 @@ async function init() {
   const summary = document.getElementById('summary');
   const status = document.getElementById('status');
   try {
-    const res = await fetch(CSV_FILE, {cache:'no-store'});
+    const res = await fetch(`${CSV_FILE}?v=${Date.now()}`, {cache:'no-store'});
     if (!res.ok) throw new Error(`Could not load ${CSV_FILE} (${res.status})`);
     const text = await res.text();
-    const rows = parseCSV(text);
+    console.log('CSV raw length', text.length); const rows = parseCSV(text); console.log('Parsed rows', rows.length, rows[0]);
     if (rows.length < 2) throw new Error('CSV appears empty.');
     const headers = rows[0];
     const cols = detectColumns(headers);
@@ -241,7 +243,7 @@ async function init() {
       };
     }).filter(r => r.date && r.season && r.dollars > 0);
 
-    if (!records.length) throw new Error('No usable AO rows found in the CSV.');
+    console.log('Usable records', records.length, records.slice(0,3)); if (!records.length) throw new Error('No usable AO rows found in the CSV.');
 
     records.sort((a,b) => a.date - b.date);
     const latest = records[records.length - 1].date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
