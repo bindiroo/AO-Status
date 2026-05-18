@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AO Status Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #7d8590;
+  --accent: #388bfd;
+
+  --fall-24: #6e7681;
+  --fall-25: #79c0ff;
+  --summer-24: #d29922;
+  --summer-25: #f78166;
+  --summer-26: #3fb950;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-left h1 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.header-left .subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.btn {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover { background: #2d333b; border-color: #58a6ff; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.btn-primary:hover { background: #58a6ff; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(63,185,80,0.15);
+  color: #3fb950;
+  border: 1px solid rgba(63,185,80,0.3);
+}
+
+/* ── Drop Overlay ── */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13,17,23,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  backdrop-filter: blur(4px);
+}
+
+.drop-overlay.active { display: flex; }
+
+.drop-box {
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  padding: 56px 80px;
+  text-align: center;
+  background: var(--surface);
+}
+
+.drop-box h2 { font-size: 1.25rem; margin-bottom: 8px; }
+.drop-box p { color: var(--text-muted); }
+.drop-icon { font-size: 2.5rem; margin-bottom: 16px; }
+
+/* ── Layout ── */
+.container { max-width: 1440px; margin: 0 auto; padding: 20px 24px; }
+
+/* ── Empty State ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  gap: 12px;
+}
+
+.empty-icon { font-size: 3rem; margin-bottom: 8px; }
+.empty-state h2 { font-size: 1.25rem; font-weight: 600; }
+.empty-state p { color: var(--text-muted); max-width: 420px; line-height: 1.6; }
+.empty-actions { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* ── KPI Cards ── */
+.kpi-section { margin-bottom: 24px; }
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 12px;
+}
+
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--card-accent, var(--accent));
+}
+
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.kpi-sub {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+.kpi-delta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.up { color: #3fb950; }
+.down { color: #f85149; }
+.neutral { color: var(--text-muted); }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  width: fit-content;
+}
+
+.tab {
+  padding: 7px 20px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.tab.active {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* ── Charts ── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.chart-card.full-width { grid-column: 1 / -1; }
+
+.chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+.chart-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chart-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.chart-container { position: relative; height: 250px; }
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.legend-swatch {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Table ── */
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.table-header {
+  padding: 14px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+
+th {
+  padding: 9px 16px;
+  text-align: right;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+th:first-child { text-align: left; }
+
+td {
+  padding: 10px 16px;
+  text-align: right;
+  border-bottom: 1px solid rgba(48,54,61,0.6);
+  font-size: 0.82rem;
+}
+
+td:first-child { text-align: left; }
+
+tr:last-child td { border-bottom: none; }
+
+tr:hover td { background: rgba(33,38,45,0.6); }
+
+.season-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.season-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.current-tag {
+  font-size: 0.65rem;
+  background: rgba(63,185,80,0.15);
+  color: #3fb950;
+  border: 1px solid rgba(63,185,80,0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 600;
+}
+
+.pos { color: #3fb950; }
+.neg { color: #f85149; }
+
+/* ── Footer ── */
+.footer {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  border-top: 1px solid var(--border);
+}
+
+input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+<input type="file" id="fileInput" accept=".csv">
+
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-box">
+    <div class="drop-icon">📂</div>
+    <h2>Drop your CSV here</h2>
+    <p>Release to load updated AO data</p>
+  </div>
+</div>
+
+<header class="header">
+  <div class="header-left">
+    <h1>AO Status Report</h1>
+    <div class="subtitle" id="lastUpdated">Drag &amp; drop AO-Status.csv to update, or click Load CSV</div>
+  </div>
+  <div class="header-right">
+    <span class="badge" id="currentSeasonBadge" style="display:none"></span>
+    <button class="btn" id="loadBtn">Load CSV</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Empty State -->
+  <div id="emptyState" class="empty-state">
+    <div class="empty-icon">📊</div>
+    <h2>No Data Loaded</h2>
+    <p>Drop your <strong>AO-Status.csv</strong> file anywhere on this page to load the dashboard, or click the button below to browse for it.</p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Choose CSV File</button>
+    </div>
+    <p style="margin-top: 16px; font-size: 0.75rem;">To share with your team: save this HTML file alongside AO-Status.csv and open via a local web server or share both files together.</p>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" style="display:none">
+
+    <!-- KPI Row -->
+    <div class="kpi-section">
+      <div class="section-label">Season Overview</div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="tabFall" onclick="switchTab('fall')">Fall Seasons</button>
+      <button class="tab" id="tabSummer" onclick="switchTab('summer')">Summer Seasons</button>
+    </div>
+
+    <!-- Fall Tab -->
+    <div id="contentFall">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Cumulative Units</div>
+              <div class="chart-subtitle">Week-over-week growth by season</div>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="chartFallCumUnits"></canvas></div>
+          <div class="chart-legend" id="legendFall"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Cumulative Revenue</div>
+              <div class="chart-subtitle">Week-over-week revenue by season</div>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="chartFallCumRevenue"></canvas></div>
+        </div>
+        <div class="chart-card full-width">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Monthly Activity — Units</div>
+              <div class="chart-subtitle">New units booked per month, by season</div>
+            </div>
+          </div>
+          <div class="chart-container" style="height:220px"><canvas id="chartFallMonthly"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summer Tab -->
+    <div id="contentSummer" style="display:none">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Cumulative Units</div>
+              <div class="chart-subtitle">Week-over-week growth by season</div>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="chartSummerCumUnits"></canvas></div>
+          <div class="chart-legend" id="legendSummer"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Cumulative Revenue</div>
+              <div class="chart-subtitle">Week-over-week revenue by season</div>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="chartSummerCumRevenue"></canvas></div>
+        </div>
+        <div class="chart-card full-width">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Monthly Activity — Units</div>
+              <div class="chart-subtitle">New units booked per month, by season</div>
+            </div>
+          </div>
+          <div class="chart-container" style="height:220px"><canvas id="chartSummerMonthly"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Season Summary Table -->
+    <div class="table-card">
+      <div class="table-header">Season Summary</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Season</th>
+            <th>Total Units</th>
+            <th>Total Revenue</th>
+            <th>Avg $/Unit</th>
+            <th>Weeks Active</th>
+            <th>Units / Week</th>
+            <th>vs Prior Year</th>
+          </tr>
+        </thead>
+        <tbody id="summaryTableBody"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /dashboard -->
+</div><!-- /container -->
+
+<div class="footer" id="footer" style="display:none">
+  Drop a new <strong>AO-Status.csv</strong> onto this page anytime to refresh all data and trend lines.
+</div>
+
+<script>
+// ── Season config ───────────────────────────────────────────────
+const SEASONS = {
+  'FALL 2024':   { color: '#6e7681', label: 'Fall 2024' },
+  'FALL 2025':   { color: '#79c0ff', label: 'Fall 2025' },
+  'SUMMER 2024': { color: '#d29922', label: 'Summer 2024' },
+  'SUMMER 2025': { color: '#f78166', label: 'Summer 2025' },
+  'SUMMER 2026': { color: '#3fb950', label: 'Summer 2026', current: true },
+};
+
+const FALL_ORDER   = ['FALL 2024', 'FALL 2025'];
+const SUMMER_ORDER = ['SUMMER 2024', 'SUMMER 2025', 'SUMMER 2026'];
+
+let charts = {};
+
+// ── Parsing ─────────────────────────────────────────────────────
+function parseAmount(s) {
+  if (!s || typeof s !== 'string') return 0;
+  return parseFloat(s.replace(/[$,\s]/g, '')) || 0;
+}
+
+function parseDate(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return null;
+  let y = parseInt(m[3]);
+  if (y < 100) y += y < 50 ? 2000 : 1900;
+  return new Date(y, parseInt(m[1]) - 1, parseInt(m[2]));
+}
+
+function normSeason(s) {
+  return s ? s.trim().toUpperCase() : '';
+}
+
+function processCSV(text) {
+  const result = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim(),
+  });
+
+  const records = [];
+  for (const row of result.data) {
+    const season = normSeason(row.Season);
+    const date   = parseDate(row.Date);
+    if (!date || !season || !SEASONS[season]) continue;
+    const units  = parseInt(row.Units) || 0;
+    const amount = parseAmount(row.Amount);
+    records.push({ season, date, units, amount });
+  }
+  return records;
+}
+
+function groupBySeason(records) {
+  const g = {};
+  for (const r of records) {
+    if (!g[r.season]) g[r.season] = [];
+    g[r.season].push(r);
+  }
+  for (const k of Object.keys(g)) {
+    g[k].sort((a, b) => a.date - b.date);
+  }
+  return g;
+}
+
+// ── Aggregation ─────────────────────────────────────────────────
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+function weeklyAgg(records) {
+  if (!records || records.length === 0) return { byWeek: {}, maxWeek: 0 };
+  const start = records[0].date;
+  const byWeek = {};
+  for (const r of records) {
+    const w = Math.floor((r.date - start) / MS_PER_WEEK);
+    if (!byWeek[w]) byWeek[w] = { units: 0, amount: 0 };
+    byWeek[w].units  += r.units;
+    byWeek[w].amount += r.amount;
+  }
+  const maxWeek = Math.max(...Object.keys(byWeek).map(Number));
+  return { byWeek, maxWeek };
+}
+
+function monthlyAgg(records) {
+  if (!records || records.length === 0) return { byMonth: {}, maxMonth: 0 };
+  const start     = records[0].date;
+  const startMo   = start.getFullYear() * 12 + start.getMonth();
+  const byMonth   = {};
+  for (const r of records) {
+    const mo = (r.date.getFullYear() * 12 + r.date.getMonth()) - startMo;
+    if (!byMonth[mo]) byMonth[mo] = { units: 0, amount: 0 };
+    byMonth[mo].units  += r.units;
+    byMonth[mo].amount += r.amount;
+  }
+  const maxMonth = Math.max(...Object.keys(byMonth).map(Number));
+  return { byMonth, maxMonth };
+}
+
+function cumulativeSeries(byWeek, globalMax, metric) {
+  const out = [];
+  let run = 0;
+  const keys = Object.keys(byWeek).map(Number);
+  const localMax = keys.length ? Math.max(...keys) : 0;
+  for (let w = 0; w <= globalMax; w++) {
+    if (byWeek[w]) run += byWeek[w][metric];
+    out.push(w <= localMax ? run : null);
+  }
+  return out;
+}
+
+// ── Formatting ──────────────────────────────────────────────────
+function fmtNum(v) {
+  if (v == null) return '';
+  if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+  if (v >= 1000)    return (v / 1000).toFixed(1) + 'K';
+  return Math.round(v).toLocaleString();
+}
+
+function fmtCur(v) {
+  if (v == null) return '';
+  if (v >= 1000000) return '$' + (v / 1000000).toFixed(2) + 'M';
+  if (v >= 1000)    return '$' + (v / 1000).toFixed(0) + 'K';
+  return '$' + Math.round(v).toLocaleString();
+}
+
+function fmtCurFull(v) {
+  return '$' + Math.round(v).toLocaleString();
+}
+
+function pct(a, b) {
+  if (!b || b === 0) return null;
+  return ((a - b) / b) * 100;
+}
+
+function pctStr(p) {
+  if (p == null) return '';
+  const sign = p >= 0 ? '+' : '';
+  return `${sign}${p.toFixed(1)}%`;
+}
+
+// ── Chart helpers ────────────────────────────────────────────────
+function chartOptions(yFmt, tooltipFmt) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 400 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#161b22',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        titleColor: '#e6edf3',
+        bodyColor: '#7d8590',
+        padding: 10,
+        callbacks: {
+          label: ctx => {
+            if (ctx.parsed.y === null) return null;
+            const val = tooltipFmt ? tooltipFmt(ctx.parsed.y) : ctx.parsed.y;
+            return `  ${ctx.dataset.label}: ${val}`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: '#6e7681', font: { size: 10 }, maxTicksLimit: 18 },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+        border: { color: 'rgba(48,54,61,0.7)' },
+      },
+      y: {
+        ticks: {
+          color: '#6e7681',
+          font: { size: 10 },
+          callback: yFmt || undefined,
+        },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+        border: { color: 'rgba(48,54,61,0.7)' },
+      },
+    },
+  };
+}
+
+function makeChart(id, type, labels, datasets, yFmt, tooltipFmt) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  charts[id] = new Chart(ctx, {
+    type,
+    data: { labels, datasets },
+    options: chartOptions(yFmt, tooltipFmt),
+  });
+}
+
+function lineDataset(label, data, color, bold) {
+  return {
+    label,
+    data,
+    borderColor: color,
+    backgroundColor: 'transparent',
+    borderWidth: bold ? 2.5 : 1.5,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    tension: 0.3,
+    spanGaps: false,
+  };
+}
+
+function barDataset(label, data, color) {
+  return {
+    label,
+    data,
+    backgroundColor: color + 'b0',
+    borderColor: color,
+    borderWidth: 1,
+    borderRadius: 2,
+  };
+}
+
+function weekLabels(n) {
+  return Array.from({ length: n }, (_, i) => `Wk ${i + 1}`);
+}
+
+function monthLabels(startDate, n) {
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const base = startDate.getMonth();
+  return Array.from({ length: n }, (_, i) => MONTHS[(base + i) % 12]);
+}
+
+// ── Legend ───────────────────────────────────────────────────────
+function renderLegend(containerId, keys) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = keys.filter(k => SEASONS[k]).map(k =>
+    `<div class="legend-item">
+       <div class="legend-swatch" style="background:${SEASONS[k].color}"></div>
+       <span>${SEASONS[k].label}${SEASONS[k].current ? ' ★' : ''}</span>
+     </div>`
+  ).join('');
+}
+
+// ── Charts rendering ─────────────────────────────────────────────
+function renderSeasonCharts(prefix, orderedKeys, cumUnitsId, cumRevenueId, monthlyId, legendId, groups) {
+  const present = orderedKeys.filter(k => groups[k] && groups[k].length > 0);
+  if (present.length === 0) return;
+
+  // Weekly aggregates
+  const weekly = {};
+  let globalMaxWeek = 0;
+  for (const k of present) {
+    const agg = weeklyAgg(groups[k]);
+    weekly[k] = agg;
+    globalMaxWeek = Math.max(globalMaxWeek, agg.maxWeek);
+  }
+
+  // Cumulative charts
+  const wLabels = weekLabels(globalMaxWeek + 1);
+
+  makeChart(cumUnitsId, 'line', wLabels,
+    present.map(k => lineDataset(
+      SEASONS[k].label + (SEASONS[k].current ? ' ★' : ''),
+      cumulativeSeries(weekly[k].byWeek, globalMaxWeek, 'units'),
+      SEASONS[k].color,
+      SEASONS[k].current
+    )),
+    v => fmtNum(v),
+    v => fmtNum(v) + ' units'
+  );
+
+  makeChart(cumRevenueId, 'line', wLabels,
+    present.map(k => lineDataset(
+      SEASONS[k].label + (SEASONS[k].current ? ' ★' : ''),
+      cumulativeSeries(weekly[k].byWeek, globalMaxWeek, 'amount'),
+      SEASONS[k].color,
+      SEASONS[k].current
+    )),
+    v => fmtCur(v),
+    v => fmtCurFull(v)
+  );
+
+  // Monthly activity chart
+  const monthly = {};
+  let globalMaxMonth = 0;
+  for (const k of present) {
+    const agg = monthlyAgg(groups[k]);
+    monthly[k] = agg;
+    globalMaxMonth = Math.max(globalMaxMonth, agg.maxMonth);
+  }
+
+  // Use first season's start date for month names
+  const firstStart = groups[present[0]][0].date;
+  const mLabels = monthLabels(firstStart, globalMaxMonth + 1);
+
+  makeChart(monthlyId, 'bar', mLabels,
+    present.map(k => {
+      const data = Array.from({ length: globalMaxMonth + 1 }, (_, mo) =>
+        monthly[k].byMonth[mo] ? monthly[k].byMonth[mo].units : 0
+      );
+      return barDataset(SEASONS[k].label + (SEASONS[k].current ? ' ★' : ''), data, SEASONS[k].color);
+    }),
+    v => fmtNum(v),
+    v => fmtNum(v) + ' units'
+  );
+
+  renderLegend(legendId, present);
+}
+
+// ── KPI Cards ────────────────────────────────────────────────────
+function renderKPIs(groups) {
+  const grid = document.getElementById('kpiGrid');
+
+  const cards = [];
+
+  function addCard(label, value, fmtFn, sub, compareVal, accentColor) {
+    const p = pct(value, compareVal);
+    const deltaHtml = p != null
+      ? `<div class="kpi-delta ${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${pctStr(p)}</div>`
+      : '';
+    cards.push(`
+      <div class="kpi-card" style="--card-accent:${accentColor || 'var(--accent)'}">
+        <div class="kpi-label">${label}</div>
+        <div class="kpi-value">${fmtFn(value)}</div>
+        <div class="kpi-sub">${sub}</div>
+        ${deltaHtml}
+      </div>
+    `);
+  }
+
+  // Helper: get totals at N weeks into season
+  function seasonAtWeek(records, maxWeeks) {
+    if (!records || !records.length) return { units: 0, amount: 0 };
+    const start = records[0].date;
+    let units = 0, amount = 0;
+    for (const r of records) {
+      const w = Math.floor((r.date - start) / MS_PER_WEEK);
+      if (w <= maxWeeks) { units += r.units; amount += r.amount; }
+    }
+    return { units, amount };
+  }
+
+  function totalOf(records) {
+    if (!records || !records.length) return { units: 0, amount: 0 };
+    return {
+      units:  records.reduce((s, r) => s + r.units,  0),
+      amount: records.reduce((s, r) => s + r.amount, 0),
+    };
+  }
+
+  function weeksIn(records) {
+    if (!records || records.length < 2) return 0;
+    const start = records[0].date;
+    const end   = records[records.length - 1].date;
+    return Math.floor((end - start) / MS_PER_WEEK);
+  }
+
+  // ── SUMMER 2026 (current, in-progress) ──────────────────────────
+  const s26 = groups['SUMMER 2026'];
+  const s25 = groups['SUMMER 2025'];
+  if (s26) {
+    const cur   = totalOf(s26);
+    const weeks = weeksIn(s26);
+    const prior = s25 ? seasonAtWeek(s25, weeks) : null;
+
+    addCard(
+      'Summer 2026 — Units',
+      cur.units,
+      fmtNum,
+      prior ? `vs Summer '25 at same point: ${fmtNum(prior.units)}` : 'Current season (in progress)',
+      prior?.units,
+      SEASONS['SUMMER 2026'].color
+    );
+    addCard(
+      'Summer 2026 — Revenue',
+      cur.amount,
+      fmtCur,
+      prior ? `vs Summer '25 at same point: ${fmtCur(prior.amount)}` : 'Current season (in progress)',
+      prior?.amount,
+      SEASONS['SUMMER 2026'].color
+    );
+  }
+
+  // ── FALL 2025 (complete) ─────────────────────────────────────────
+  const f25 = groups['FALL 2025'];
+  const f24 = groups['FALL 2024'];
+  if (f25) {
+    const cur25  = totalOf(f25);
+    const prior24 = f24 ? totalOf(f24) : null;
+
+    addCard(
+      'Fall 2025 — Units',
+      cur25.units,
+      fmtNum,
+      prior24 ? `vs Fall '24 total: ${fmtNum(prior24.units)}` : 'Full season total',
+      prior24?.units,
+      SEASONS['FALL 2025'].color
+    );
+    addCard(
+      'Fall 2025 — Revenue',
+      cur25.amount,
+      fmtCur,
+      prior24 ? `vs Fall '24 total: ${fmtCur(prior24.amount)}` : 'Full season total',
+      prior24?.amount,
+      SEASONS['FALL 2025'].color
+    );
+  }
+
+  // ── SUMMER 2025 (complete) ────────────────────────────────────────
+  if (s25 && !s26) {
+    const cur = totalOf(s25);
+    const prior = groups['SUMMER 2024'] ? totalOf(groups['SUMMER 2024']) : null;
+    addCard(
+      'Summer 2025 — Units',
+      cur.units,
+      fmtNum,
+      prior ? `vs Summer '24: ${fmtNum(prior.units)}` : 'Full season total',
+      prior?.units,
+      SEASONS['SUMMER 2025'].color
+    );
+    addCard(
+      'Summer 2025 — Revenue',
+      cur.amount,
+      fmtCur,
+      prior ? `vs Summer '24: ${fmtCur(prior.amount)}` : 'Full season total',
+      prior?.amount,
+      SEASONS['SUMMER 2025'].color
+    );
+  }
+
+  // ── All-time totals ───────────────────────────────────────────────
+  let allUnits = 0, allAmount = 0;
+  for (const k of Object.keys(groups)) {
+    const t = totalOf(groups[k]);
+    allUnits  += t.units;
+    allAmount += t.amount;
+  }
+  addCard('All-Time — Units',   allUnits,  fmtNum, 'Across all seasons', null, 'var(--accent)');
+  addCard('All-Time — Revenue', allAmount, fmtCur, 'Across all seasons', null, 'var(--accent)');
+
+  grid.innerHTML = cards.join('');
+}
+
+// ── Summary Table ─────────────────────────────────────────────────
+function renderTable(groups) {
+  const ORDER = ['FALL 2024', 'FALL 2025', 'SUMMER 2024', 'SUMMER 2025', 'SUMMER 2026'];
+  const PRIOR = {
+    'FALL 2025': 'FALL 2024',
+    'SUMMER 2025': 'SUMMER 2024',
+    'SUMMER 2026': 'SUMMER 2025',
+  };
+
+  const tbody = document.getElementById('summaryTableBody');
+  const rows  = ORDER.filter(k => groups[k]).map(k => {
+    const recs   = groups[k];
+    const units  = recs.reduce((s, r) => s + r.units, 0);
+    const amount = recs.reduce((s, r) => s + r.amount, 0);
+    const avgPer = units > 0 ? amount / units : 0;
+
+    const first = recs[0].date;
+    const last  = recs[recs.length - 1].date;
+    const weeks = Math.max(1, Math.ceil((last - first) / MS_PER_WEEK) + 1);
+    const uPerW = units / weeks;
+
+    const priorKey = PRIOR[k];
+    let yoyHtml    = '<span class="neutral">—</span>';
+    if (priorKey && groups[priorKey]) {
+      const priorUnits = groups[priorKey].reduce((s, r) => s + r.units, 0);
+      const p = pct(units, priorUnits);
+      if (p != null) {
+        yoyHtml = `<span class="${p >= 0 ? 'pos' : 'neg'}">${p >= 0 ? '▲' : '▼'} ${pctStr(p)} units</span>`;
+      }
+    }
+
+    const cfg  = SEASONS[k] || {};
+    const isCur = cfg.current;
+
+    return `
+      <tr>
+        <td>
+          <div class="season-name">
+            <div class="season-dot" style="background:${cfg.color || '#888'}"></div>
+            ${cfg.label || k}
+            ${isCur ? '<span class="current-tag">Active</span>' : ''}
+          </div>
+        </td>
+        <td>${units.toLocaleString()}</td>
+        <td>${fmtCurFull(amount)}</td>
+        <td>$${avgPer.toFixed(2)}</td>
+        <td>${weeks}</td>
+        <td>${Math.round(uPerW).toLocaleString()}</td>
+        <td>${yoyHtml}</td>
+      </tr>
+    `;
+  });
+
+  // Totals row
+  const totalUnits  = ORDER.filter(k => groups[k]).reduce((s, k) => s + groups[k].reduce((a, r) => a + r.units, 0), 0);
+  const totalAmount = ORDER.filter(k => groups[k]).reduce((s, k) => s + groups[k].reduce((a, r) => a + r.amount, 0), 0);
+  rows.push(`
+    <tr style="font-weight:600; border-top: 1px solid var(--border);">
+      <td>Grand Total</td>
+      <td>${totalUnits.toLocaleString()}</td>
+      <td>${fmtCurFull(totalAmount)}</td>
+      <td>$${totalUnits > 0 ? (totalAmount / totalUnits).toFixed(2) : '0.00'}</td>
+      <td colspan="3"></td>
+    </tr>
+  `);
+
+  tbody.innerHTML = rows.join('');
+}
+
+// ── Main load function ───────────────────────────────────────────
+function loadData(text, filename) {
+  const records = processCSV(text);
+  if (records.length === 0) {
+    alert('No valid records found. Make sure the file has Season, Date, Units, and Amount columns.');
+    return;
+  }
+
+  const groups = groupBySeason(records);
+
+  document.getElementById('emptyState').style.display  = 'none';
+  document.getElementById('dashboard').style.display   = '';
+  document.getElementById('footer').style.display      = '';
+
+  // Update header
+  const now = new Date();
+  document.getElementById('lastUpdated').textContent =
+    `${filename} · Updated ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+  // Show current season badge
+  const badge = document.getElementById('currentSeasonBadge');
+  if (groups['SUMMER 2026']) {
+    badge.textContent = 'Summer 2026 Active';
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  renderKPIs(groups);
+
+  renderSeasonCharts(
+    'fall',
+    FALL_ORDER,
+    'chartFallCumUnits', 'chartFallCumRevenue', 'chartFallMonthly', 'legendFall',
+    groups
+  );
+
+  renderSeasonCharts(
+    'summer',
+    SUMMER_ORDER,
+    'chartSummerCumUnits', 'chartSummerCumRevenue', 'chartSummerMonthly', 'legendSummer',
+    groups
+  );
+
+  renderTable(groups);
+}
+
+// ── Tab switching ────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('contentFall').style.display   = tab === 'fall'   ? '' : 'none';
+  document.getElementById('contentSummer').style.display = tab === 'summer' ? '' : 'none';
+  document.getElementById('tabFall').classList.toggle('active',   tab === 'fall');
+  document.getElementById('tabSummer').classList.toggle('active', tab === 'summer');
+}
+
+// ── File I/O ─────────────────────────────────────────────────────
+document.getElementById('loadBtn').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => loadData(ev.target.result, file.name);
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// Drag-and-drop
+let dragCount = 0;
+
+document.addEventListener('dragenter', e => {
+  e.preventDefault();
+  dragCount++;
+  document.getElementById('dropOverlay').classList.add('active');
+});
+
+document.addEventListener('dragleave', () => {
+  dragCount--;
+  if (dragCount <= 0) {
+    dragCount = 0;
+    document.getElementById('dropOverlay').classList.remove('active');
+  }
+});
+
+document.addEventListener('dragover', e => e.preventDefault());
+
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dragCount = 0;
+  document.getElementById('dropOverlay').classList.remove('active');
+  const file = Array.from(e.dataTransfer.files).find(f => f.name.endsWith('.csv'));
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => loadData(ev.target.result, file.name);
+  reader.readAsText(file);
+});
+
+// Auto-load from same directory (works when served over HTTP)
+fetch('AO-Status.csv')
+  .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+  .then(text => loadData(text, 'AO-Status.csv'))
+  .catch(() => {}); // silently fail; user will use file picker / drag-drop
+</script>
+</body>
+</html>
