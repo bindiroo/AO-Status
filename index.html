@@ -579,7 +579,7 @@ function processCSV(text) {
   for (const row of result.data) {
     const season = normSeason(row.Season);
     const date   = parseDate(row.Date);
-    if (!date || !season || !SEASONS[season]) continue;
+    if (!date || !season) continue;
     const units  = parseInt(row.Units) || 0;
     const amount = parseAmount(row.Amount);
     records.push({ season, date, units, amount });
@@ -1145,9 +1145,9 @@ document.addEventListener('drop', e => {
 
 // Auto-load from same directory (works when served over HTTP)
 fetch('AO-Status.csv')
-  .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+  .then(r => { if (!r.ok) throw new Error('CSV not found'); return r.text(); })
   .then(text => loadData(text, 'AO-Status.csv'))
-  .catch(() => {}); // silently fail; user will use file picker / drag-drop
+  .catch(err => console.warn('AO-Status.csv auto-load failed:', err));
 </script>
 </body>
 </html>
