@@ -569,19 +569,35 @@ function normSeason(s) {
 }
 
 function processCSV(text) {
-  const result = Papa.parse(text, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: h => h.trim(),
-  });
+  // Use header:false + index-based access so the parser works regardless of
+  // whether the CSV uses a simple layout (cols 0-4) or a sparse layout with
+  // empty filler columns (cols 0, 4, 8, 9, 10 — same as the All Orders export).
+  const result = Papa.parse(text, { header: false, skipEmptyLines: true });
 
   const records = [];
   for (const row of result.data) {
-    const season = normSeason(row.Season);
-    const date   = parseDate(row.Date);
-    if (!date || !season) continue;
-    const units  = parseInt(row.Units) || 0;
-    const amount = parseAmount(row.Amount);
+    const season = (row[0] || '').trim().toUpperCase();
+    if (!season || season === 'SEASON') continue; // skip header row
+
+    // Detect format by which column holds a parseable date:
+    //   sparse export  → Date in col 4, Units in col 8, Amount in col 9
+    //   simple export  → Date in col 1, Units in col 2, Amount in col 3
+    const dateSparse = parseDate(row[4]);
+    const dateSimple = parseDate(row[1]);
+
+    let date, units, amount;
+    if (dateSparse) {
+      date   = dateSparse;
+      units  = parseInt(row[8])  || 0;
+      amount = parseAmount(row[9]);
+    } else if (dateSimple) {
+      date   = dateSimple;
+      units  = parseInt(row[2])  || 0;
+      amount = parseAmount(row[3]);
+    } else {
+      continue; // no valid date — summary row or header
+    }
+
     records.push({ season, date, units, amount });
   }
   return records;
