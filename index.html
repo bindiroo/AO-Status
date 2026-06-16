@@ -569,35 +569,56 @@ function normSeason(s) {
 }
 
 function processCSV(text) {
-  // Use header:false + index-based access so the parser works regardless of
-  // whether the CSV uses a simple layout (cols 0-4) or a sparse layout with
-  // empty filler columns (cols 0, 4, 8, 9, 10 — same as the All Orders export).
+  // Auto-detects three CSV formats that ApparelMagic may export:
+  //
+  // Format A — Order-line detail (new export):
+  //   col 0 = Order# (numeric), col 7 = Qty, col 8 = Amount,
+  //   col 9 = Date, col 10 = Season
+  //   Header row has "Order" in col 0.
+  //
+  // Format B — Sparse summary (col 0 = Season, col 4 = Date, col 8 = Units, col 9 = Amount)
+  // Format C — Simple summary (col 0 = Season, col 1 = Date, col 2 = Units, col 3 = Amount)
+
   const result = Papa.parse(text, { header: false, skipEmptyLines: true });
-
   const records = [];
+
   for (const row of result.data) {
-    const season = (row[0] || '').trim().toUpperCase();
-    if (!season || season === 'SEASON') continue; // skip header row
+    if (!row || row.length < 3) continue;
 
-    // Detect format by which column holds a parseable date:
-    //   sparse export  → Date in col 4, Units in col 8, Amount in col 9
-    //   simple export  → Date in col 1, Units in col 2, Amount in col 3
-    const dateSparse = parseDate(row[4]);
-    const dateSimple = parseDate(row[1]);
+    const col0 = (row[0] || '').trim();
+    const col0Upper = col0.toUpperCase();
 
-    let date, units, amount;
-    if (dateSparse) {
-      date   = dateSparse;
-      units  = parseInt(row[8])  || 0;
-      amount = parseAmount(row[9]);
-    } else if (dateSimple) {
-      date   = dateSimple;
-      units  = parseInt(row[2])  || 0;
-      amount = parseAmount(row[3]);
-    } else {
-      continue; // no valid date — summary row or header
+    // Skip header rows
+    if (col0Upper === 'SEASON' || col0Upper === 'ORDER') continue;
+
+    let season, date, units, amount;
+
+    // Format A: col 0 is a numeric order number
+    if (/^\d+$/.test(col0)) {
+      const col10 = (row[10] || '').trim().toUpperCase();
+      if (!col10) continue; // subtotal/aggregate row — skip
+      season = col10;
+      date   = parseDate(row[9]);
+      units  = parseInt(row[7])  || 0;
+      amount = parseAmount(row[8]);
+    }
+    // Formats B & C: col 0 is the season name
+    else if (col0Upper) {
+      season = col0Upper;
+      const dateSparse = parseDate(row[4]); // Format B
+      const dateSimple = parseDate(row[1]); // Format C
+      if (dateSparse) {
+        date   = dateSparse;
+        units  = parseInt(row[8])  || 0;
+        amount = parseAmount(row[9]);
+      } else if (dateSimple) {
+        date   = dateSimple;
+        units  = parseInt(row[2])  || 0;
+        amount = parseAmount(row[3]);
+      }
     }
 
+    if (!season || !date) continue;
     records.push({ season, date, units, amount });
   }
   return records;
